@@ -15,7 +15,7 @@
  * Author: Pedro Andrade
  *
  *	Updates:
- *	Date: 2023-05-01	v1.0 Initial release
+ *	Date: 2023-04-17	v1.0 Initial release
  */
 
 import java.text.DecimalFormat
