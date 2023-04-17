@@ -161,6 +161,7 @@ def refreshToken() { // checks if token must be refreshed
     if (tokenTS.plus(tokenValidity as int)<(new Date())) {
         logDebug("I need to renew the token")
         getToken()
+	pauseExecution(2000)
     }
 }
 
@@ -182,7 +183,7 @@ def getToken() {
 def getCharger(){
     
     refreshToken()
-    pauseExecution(2000)
+    
     def request=[
         			uri: "https://api.wall-box.com",
         			path: "/v2/charger/${chargerId}",
@@ -250,7 +251,7 @@ def parseCharger(resp) {
 def setMaxChargingCurrent(amperage) {
 
     refreshToken()
-    pauseExecution(2000)
+    
     def request=[
         			uri: "https://api.wall-box.com",
                     path: "/v2/charger/${chargerId}",
@@ -280,7 +281,7 @@ def setMaxChargingCurrent(amperage) {
 def lockUnlockCharger(lock) {
 
     refreshToken()
-    pauseExecution(2000)
+    
     def request=[
         			uri: "https://api.wall-box.com",
                     path: "/v2/charger/${chargerId}",
@@ -309,7 +310,7 @@ def lockUnlockCharger(lock) {
 def pauseResumeCharge(action) {
 
     refreshToken()
-    pauseExecution(2000)
+    
     def request=[
         			uri: "https://api.wall-box.com",
                     path: "/v3/chargers/${chargerId}/remote-action",
