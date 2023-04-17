@@ -63,6 +63,7 @@ metadata {
     command "lockUnlockCharger", [[name: "lock", type: "ENUM", constraints: [0,1]]]
     command "pauseResumeCharge", [[name: "action", type: "ENUM", constraints: ["PAUSE","RESUME"]]]
     command "restartCharger", [[name: "confirm", type: "STRING", description: "Write YES to confirm charger restart"]]
+    command "resetToken"
 	}
 }
 
@@ -144,7 +145,6 @@ def poll() {
 def refresh() { // retrieves latest values for device attributes
 	
     logDebug("Executing 'refresh'")
-    
     getCharger()
     
 }
@@ -158,7 +158,7 @@ def refreshToken() { // checks if token must be refreshed
 
     logTrace(tokenTS as String)
     
-    if ((tokenTS)>(new Date().plus(tokenValidity as int))) {
+    if (tokenTS.plus(tokenValidity as int)<(new Date())) {
         logDebug("I need to renew the token")
         getToken()
     }
@@ -182,7 +182,7 @@ def getToken() {
 def getCharger(){
     
     refreshToken()
-    
+    pauseExecution(2000)
     def request=[
         			uri: "https://api.wall-box.com",
         			path: "/v2/charger/${chargerId}",
@@ -250,7 +250,7 @@ def parseCharger(resp) {
 def setMaxChargingCurrent(amperage) {
 
     refreshToken()
-    
+    pauseExecution(2000)
     def request=[
         			uri: "https://api.wall-box.com",
                     path: "/v2/charger/${chargerId}",
@@ -280,7 +280,7 @@ def setMaxChargingCurrent(amperage) {
 def lockUnlockCharger(lock) {
 
     refreshToken()
-    
+    pauseExecution(2000)
     def request=[
         			uri: "https://api.wall-box.com",
                     path: "/v2/charger/${chargerId}",
@@ -309,7 +309,7 @@ def lockUnlockCharger(lock) {
 def pauseResumeCharge(action) {
 
     refreshToken()
-    
+    pauseExecution(2000)
     def request=[
         			uri: "https://api.wall-box.com",
                     path: "/v3/chargers/${chargerId}/remote-action",
@@ -341,3 +341,10 @@ def restartCharger(confirm) {
         pauseResumeCharge("RESTART")
     }
 }
+
+def installed(){
+	sendEvent(name: "bearerToken", value: "null")
+    sendEvent(name: "tokenTimestamp", value: "19000101000000")
+}
+
+def resetToken() { installed() }
