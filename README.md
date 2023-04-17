@@ -49,3 +49,6 @@ I have only tested with a Pulsar Plus charger, European 22kw version.
 ** Usage **
 
 I believe commands are self explanatory
+
+** Credits **
+Built inspired by the excellent work of https://github.com/flhoest/Wallbox
