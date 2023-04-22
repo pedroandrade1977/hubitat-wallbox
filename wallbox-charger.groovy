@@ -15,12 +15,13 @@
  * Author: Pedro Andrade
  *
  *	Updates:
- *	Date: 2023-04-17	v1.0 Initial release
+ *	Date: 2023-04-17	v1.0     Initial release
+ *  Date: 2023-04-22	v1.1     Change charger status API to retrieve additional attributes
+ *                               Added ability to schedule periodic refresh with interval in minutes 
+ *
+ *  Note: Tested with a Wallbox Pulsar Plus only
  */
 
-import java.text.DecimalFormat
-import groovy.json.JsonSlurper
-import groovy.json.JsonOutput
 import groovy.transform.Field
 import java.text.SimpleDateFormat
 
@@ -37,7 +38,11 @@ preferences {
     
         // log level
         input(name: "logLevel", type: "enum", title: "Log Level", options: ["0","1","2","3","4"], defaultValue: "2");
+
+        // refresh interval
+//        input(name: "refreshInterval", type:"number", title: "Refresh interval in minutes (0 for no schedule)", required: true, defaultValue: 5);
 }
+
 
 metadata {
 	definition (name: "Wallbox Charger", namespace: "HE_pfta", author: "Pedro Andrade") {
@@ -46,16 +51,19 @@ metadata {
 	capability "Polling"
 	capability "Refresh"
 
-    attribute "uid", "number"
 	attribute "name", "string"
 	attribute "status", "number"
 	attribute "statusName", "string"    // mapped from status attribute
-	attribute "chargerType", "string"
 	attribute "locked", "number"
-    attribute "connectionType", "string"
-    attribute "wifiSignal", "number"
-    attribute "chargingTime", "string"
-    attribute "maxChargingCurrent", "number"
+    attribute "charging_time", "string"
+    attribute "max_charging_current", "number"
+    attribute "energy_price","number"
+    attribute "max_available_power","number"
+    attribute "charging_speed","number"
+    attribute "added_range","number"
+    attribute "cost","number"
+    attribute "current_mode","number"
+    attribute "state_of_charge","number"
     attribute "bearerToken", "string"
     attribute "tokenTimestamp","string"
 
@@ -64,6 +72,7 @@ metadata {
     command "pauseResumeCharge", [[name: "action", type: "ENUM", constraints: ["PAUSE","RESUME"]]]
     command "restartCharger", [[name: "confirm", type: "STRING", description: "Write YES to confirm charger restart"]]
     command "resetToken"
+    command "updateScheduledRefresh", [[name: "minutes", type: "NUMBER", description: "Interval in minutes (0 do disable)", required: true, defaultValue: 0]]
 	}
 }
 
@@ -149,7 +158,7 @@ def refresh() { // retrieves latest values for device attributes
     
 }
 
-def refreshToken() { // checks if token must be refreshed
+def refreshToken() { // checks if token must be refreshed and refreshes if needed - checks based on configured validity duration
 
     logDebug("refresh token")
     
@@ -161,11 +170,11 @@ def refreshToken() { // checks if token must be refreshed
     if (tokenTS.plus(tokenValidity as int)<(new Date())) {
         logDebug("I need to renew the token")
         getToken()
-	pauseExecution(2000)
+	    pauseExecution(2000)
     }
 }
 
-def getToken() {
+def getToken() { // gets a new token using user credentials
     
     def request=[
         			uri: "https://api.wall-box.com",
@@ -180,13 +189,13 @@ def getToken() {
                 parseToken(resp)}
 }
 
-def getCharger(){
+def getCharger(){ // retrieves last charger information from wallbox API
     
     refreshToken()
     
     def request=[
         			uri: "https://api.wall-box.com",
-        			path: "/v2/charger/${chargerId}",
+        			path: "/chargers/status/${chargerId}",
         			requestContentType: "application/json;charset=utf-8",
                     headers: [Authorization: "Bearer ${device.currentValue("bearerToken") as String}"]
                    	]
@@ -198,7 +207,7 @@ def getCharger(){
                 parseCharger(resp)}
 }
 
-def parseToken(resp) {
+def parseToken(resp) { // parses get token response and updates token attributes
     if(resp.status == 200) {
         sendEvent(name: "bearerToken", value: resp.data.jwt)
         SimpleDateFormat timestampFormat = new SimpleDateFormat("yyyyMMddHHmmss")
@@ -207,37 +216,47 @@ def parseToken(resp) {
     else {logDebug("Error retrieving token")}
 }
 
-def parseCharger(resp) {
+def parseCharger(resp) { // parses get charger response and updates attributes
     if(resp.status == 200) {
-        logData(resp.data)
-        resp.data.data.chargerData.each {attr ->
+        resp.data.each {attr ->
             logTrace("Processing attribute: "+attr)
             switch (attr.getKey()) {
-                case "chargerType":
-                case "connectionType":
-                case "uid":
-                case "name":
-                case "locked":
-                case "wifiSignal":
-                case "maxChargingCurrent":
+                case "config_data":
+                    resp.data.config_data.each { confAttr ->
+                        logTrace("Processing config attribute: "+confAttr)
+                        switch (confAttr.getKey()) {
+                            case "name":
+                            case "locked":
+                            case "max_charging_current":
+                            case "energy_price":
+                                sendEvent(name:confAttr.getKey(), value: confAttr.getValue())
+                            break;
+                            default:
+                                logTrace("Not processed config attribute!")
+                        }
+                    }
+                break;
+                case "max_available_power":
+                case "charging_speed":
+                case "added_range":
+                case "cost":
+                case "current_mode":
+                case "state_of_charge":
                     sendEvent(name:attr.getKey(), value: attr.getValue())
                 break;
-                case "status":
-                    sendEvent(name:attr.getKey(), value: attr.getValue())
-                   sendEvent(name:"statusName", value: statusNames.getAt(attr.getValue()))
+                case "status_id":
+                    sendEvent(name:"status", value: attr.getValue())
+                    sendEvent(name:"statusName", value: statusNames.getAt(attr.getValue()))
                 break;
-                case "addedEnergy":
+                case "added_energy":
                     sendEvent(name:"energy", value: attr.getValue())
                 break;
-                case "addedEnergy":
-                    sendEvent(name:"energy", value: attr.getValue())
-                break;
-                case "chargingPower":
+                case "charging_power":
                     sendEvent(name:"power", value: attr.getValue())
                 break;
-                case "chargingTime":
+                case "charging_time":
                     String timestamp = new GregorianCalendar( 0, 0, 0, 0, 0, attr.getValue(), 0 ).time.format( 'HH:mm:ss' )
-                    sendEvent(name:"chargingTime", value: timestamp)
+                    sendEvent(name:"charging_time", value: timestamp)
                 break;
                 default:
                     logTrace("Not processed attribute!")
@@ -248,7 +267,7 @@ def parseCharger(resp) {
 }
 
 
-def setMaxChargingCurrent(amperage) {
+def setMaxChargingCurrent(amperage) { // allows to change the maximum current to be used for charging
 
     refreshToken()
     
@@ -278,7 +297,7 @@ def setMaxChargingCurrent(amperage) {
 }
 
 
-def lockUnlockCharger(lock) {
+def lockUnlockCharger(lock) { // allows locking or unlocking charger
 
     refreshToken()
     
@@ -307,7 +326,8 @@ def lockUnlockCharger(lock) {
     }
 }
 
-def pauseResumeCharge(action) {
+
+def pauseResumeCharge(action) { // allows pausing and resuming charging
 
     refreshToken()
     
@@ -327,6 +347,7 @@ def pauseResumeCharge(action) {
                 logDebug("pauseResumeCharge FAILED")
             } else {
                 logDebug("pauseResumeCharge SUCCESS")
+                pauseExecution(5000) // wait for status update before refreshing
                 refresh()
             }
         }
@@ -336,16 +357,35 @@ def pauseResumeCharge(action) {
     }
 }
 
-def restartCharger(confirm) {
+def restartCharger(confirm) { // allows restarting charger - requires parameter = "YES" to prevent accidental restarting from the UI
     if (confirm=="YES") {
         logDebug("restarting charger")
         pauseResumeCharge("RESTART")
     }
 }
 
-def installed(){
-	sendEvent(name: "bearerToken", value: "null")
-    sendEvent(name: "tokenTimestamp", value: "19000101000000")
+def installed(){ // initializes token upon initial installation
+    resetToken()
 }
 
-def resetToken() { installed() }
+def resetToken() { // forces token reset
+	sendEvent(name: "bearerToken", value: "null")
+    sendEvent(name: "tokenTimestamp", value: "19000101000000")
+} 
+
+private updateScheduledRefresh(minutes) { // schedules refresh according to the parameter in minutes
+    logDebug("updateScheduledRefresh()")
+    unschedule()
+    // Get minutes from settings
+    //def minutes = settings.refreshInterval?.toInteger()
+    if (!minutes || minutes==0) {
+        logDebug("Will not enable scheduled refresh")
+    } else {
+        logDebug("Scheduling polling task for every '${minutes}' minutes")
+        if (minutes == 1){
+            runEvery1Minute(refresh)
+        } else {
+            "runEvery${minutes}Minutes"(refresh)
+        }
+    }
+}
