@@ -147,7 +147,7 @@ private void logData(Map data) {
 
 
 def poll() {
-	log.debug "Executing 'poll'"
+	logDebug("Executing 'poll'")
 	refresh()
 }
 
@@ -287,6 +287,7 @@ def setMaxChargingCurrent(amperage) { // allows to change the maximum current to
                 logDebug("setMaxChargingCurrent FAILED")
             } else {
                 logDebug("setMaxChargingCurrent SUCCESS")
+                pauseExecution(5000) // wait for status update before refreshing
                 refresh()
             }
         }
@@ -317,6 +318,7 @@ def lockUnlockCharger(lock) { // allows locking or unlocking charger
                 logDebug("lockUnlockCharger FAILED")
             } else {
                 logDebug("lockUnlockCharger SUCCESS")
+                pauseExecution(5000) // wait for status update before refreshing
                 refresh()
             }
         }
