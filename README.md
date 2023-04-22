@@ -12,7 +12,9 @@ This driver is for integrating Hubitat with your Wallbox EV Charger.
 2.	Your credentials for the my.wallbox portal
 3.	Your charger ID. This is the charger's serial number that you can see in Wallbox app, Charger Info screen
 
+
 **Supported Features**
+
 The initial version of the Hubitat drivers support the following capabilities:
 1.	Retrieve certain attributes of the charger (i selected the ones I thought were useful, there are more let me know if you need any to add them)
 2.	Pause/Resume charging
@@ -48,7 +50,15 @@ I have only tested with a Pulsar Plus charger, European 22kw version.
 
 ** Usage **
 
-I believe commands are self explanatory
+A. Lock Unlock command allows locking or unlocking the charger - select 0 for unlock, 1 for lock
+B. Pause Resume Charge allows pausing and resuming charging - select PAUSE to pause, RESUME to resume
+C. Press Poll or Refresh to retrieve latest charger information
+D. Refresh Token can be used to obtain a new token. This can be useful e.g. if you change password
+E. Restart Charger does just that - reboots the device. To avoid unintended use, please enter the word YES in the parameter for this command
+F. Set Max Charging Current allows chaging the max amperage used by the device for charging. My device is between 6 and 32, others may have different ranges
+E. If you would like the driver to automatically refresh periodically, press the Update Scheduled Refresh command with the interval in minutes of the update. Alternatively you may want to refresh using Rule Machine for more flexibility.
+
 
 ** Credits **
-Built inspired by the excellent work of https://github.com/flhoest/Wallbox
+
+Built inspired by the excellent work of https://github.com/flhoest/Wallbox. HA implementation was also reviewed.
